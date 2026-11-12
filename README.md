@@ -66,3 +66,17 @@ WYSIWYG-редактором, ветки комментариев, профил�
 npm exec mam@latest bog/jj/app
 node bog/jj/app/-/node.test.js
 ```
+
+## Деплой
+
+Модуль живёт отдельным репозиторием [b-on-g/jj](https://github.com/b-on-g/jj)
+(как `bog/gram` и `bog/merchquarium`), а в пакете `bog` подключается строкой
+`pack jj` в `bog/bog.meta.tree`.
+
+`.github/workflows/deploy.yml` собирает `bog/jj/app` через
+`hyoo-ru/mam_build@master2` и выкладывает `bog/jj/app/-` в ветку `gh-pages`
+через `hyoo-ru/gh-deploy@v4.4.1`:
+
+- сайт — https://b-on-g.github.io/jj/
+- зависимости (`bog/theme`, `bog/builderui`, `bog/favicon`, `bog/install`,
+  `giper`) MAM подтягивает сам по `pack`-строкам `bog.meta.tree` и `.meta.tree`.
