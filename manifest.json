@@ -1,0 +1,17 @@
+{
+	"name": "Живой журнал — блоги на Гипер Базе",
+	"short_name": "Живой журнал",
+	"description": "Живой журнал на Гипер Базе: блоги авторов, посты, комментарии и подписки",
+	"id": "bog_jj_app",
+	"start_url": "./",
+	"display": "standalone",
+	"background_color": "#18181b",
+	"theme_color": "#18181b",
+	"lang": "ru",
+	"dir": "ltr",
+	"categories": [
+		"social",
+		"news"
+	],
+	"scope": "./"
+}

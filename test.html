@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru" mol_view_root>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, viewport-fit=cover" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<title>Живой журнал — блоги на Гипер Базе</title>
+		<meta name="description" content="Живой журнал на Гипер Базе: блоги авторов, посты, комментарии и подписки. Данные живут у вас, синхронизация — через сеть узлов." />
+		<link rel="canonical" href="https://b-on-g.github.io/jj/" />
+		<link rel="manifest" href="manifest.json" />
+		<meta property="og:title" content="Живой журнал — блоги на Гипер Базе" />
+		<meta property="og:type" content="website" />
+		<meta property="og:description" content="Живой журнал на Гипер Базе: блоги авторов, посты, комментарии и подписки. Данные живут у вас, синхронизация — через сеть узлов." />
+		<meta property="og:site_name" content="Живой журнал" />
+		<meta property="og:url" content="https://b-on-g.github.io/jj/" />
+		<meta property="og:locale" content="ru_RU" />
+		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:title" content="Живой журнал — блоги на Гипер Базе" />
+		<meta name="twitter:description" content="Живой журнал на Гипер Базе: блоги авторов, посты, комментарии и подписки. Данные живут у вас, синхронизация — через сеть узлов." />
+		<meta name="theme-color" content="#18181b" />
+	</head>
+	<body mol_view_root>
+		<div mol_view_root="$bog_jj_app"></div>
+		<script src="web.js"></script>
+	
+				<script src="/mol/build/client/client.js" charset="utf-8"></script>
+				<script src="web.test.js" charset="utf-8"></script>
+				<script>
+					addEventListener( 'load', ()=> setTimeout( ()=> {
+						const audit =  document.createElement( 'script' )
+						audit.src = 'web.audit.js'
+						document.head.appendChild( audit )
+					}, 500 ) )
+				</script>
+				</body>
+</html>
