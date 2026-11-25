@@ -1710,6 +1710,30 @@ $bog_jj_settings $mol_page
 							<= image_drop_icon* $mol_icon_close
 							<= image_drop_text* \
 
+$bog_id_enter $mol_list
+	provider \https://dev-cmyser.github.io/id/
+	scope \account
+	apply? \
+	rows <= parts /
+	Enter $mol_button_major
+		title @ \Sign in with Giper ID
+		click? <=> enter? null
+	Hint $mol_paragraph
+		title @ \Keeps the key of this account in Giper ID. Other devices get the same account. Nothing changes here until you confirm it.
+	Status $mol_paragraph
+		title <= status \
+	Replace $mol_button_minor
+		title <= replace_title @ \Switch to the account from Giper ID
+		click? <=> replace? null
+	Error $mol_paragraph
+		title <= error? \
+	armed? false
+	replace_sure @ \Really switch? The account changes in all apps of this domain
+	wait @ \Getting the key from Giper Base…
+	conflict @ \Giper ID keeps another account. The account of this device stays until you switch.
+	done @ \Signed in with Giper ID: {name}
+	error_bad @ \This does not look like an account key
+
 $bog_jj_app $mol_page
 	title @ \Live Journal
 	Feed_title @ \Feed
@@ -1765,3 +1789,70 @@ $bog_jj_app $mol_page
 					tag <= tag_current
 				<= Settings* $bog_jj_settings
 					blog_link <= settings_blog* \
+		<= Id $bog_id_enter
+
+$mol_embed_native $mol_scroll
+	dom_name \iframe
+	window null
+	attr *
+		^
+		src <= uri? \about:config
+	sub /
+		<= Fallback $mol_link
+			uri <= uri
+			sub /
+				<= title \
+	message *
+		hashchange? <=> uri_change? null
+
+$mol_frame $mol_embed_native
+	attr *
+		tabindex <= tabindex
+		allow <= allow \
+		src <= uri
+		srcdoc <= html null
+	fullscreen true
+	accelerometer true
+	autoplay true
+	encription true
+	gyroscope true
+	pip true
+	clipboard_read true
+	clipboard_write true
+
+$giper_web_frame $mol_frame
+	uri \https://web.giper.dev/#mol_lights={lights}/current={current}/query={query}
+	- uri \http://localhost:9080/giper/web/bar/-/test.html#mol_lights={lights}/current={current}/query={query}
+	query \
+
+$bog_dock_frame $giper_web_frame
+	host \https://b-on-g.github.io/dock/
+	lights true
+	clipboard_read false
+	clipboard_write false
+
+$bog_dock_side $mol_view
+	mode \none
+	opened? false
+	attr *
+		^
+		bog_dock_side_mode <= mode
+		bog_dock_side_opened <= opened
+	sub /
+		<= Shade $mol_view
+			event *
+				click? <=> close? null
+		<= Frame $bog_dock_frame
+			lights <= lights true
+		<= Tab $mol_view
+			dom_name \button
+			attr *
+				^
+				type \button
+				title <= tab_hint @ \Apps
+				aria-label <= tab_hint
+				aria-expanded <= tab_expanded \false
+			event *
+				pointerdown? <=> tab_grab? null
+				pointermove? <=> tab_move? null
+				click? <=> tab_click? null

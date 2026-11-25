@@ -2718,6 +2718,18 @@ var $;
 var $;
 (function ($) {
     $mol_test({
+        async 'storage level'() {
+            // prevent async in tests
+            await $mol_wire_async($mol_storage).level();
+        }
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
         'local get set delete'() {
             var key = '$mol_state_local_test:' + Math.random();
             $mol_assert_equal($mol_state_local.value(key), null);
@@ -2745,41 +2757,6 @@ var $;
         ], $mol_state_local_mock, "value", null);
         context.$mol_state_local = $mol_state_local_mock;
     });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    function parse(theme) {
-        if (theme === 'true')
-            return true;
-        if (theme === 'false')
-            return false;
-        return null;
-    }
-    // Get once because chrome switches to light on print
-    const base = $.$mol_media.match('(prefers-color-scheme: light)');
-    /**
-     * Switcher between light/dark themes (usually for `mol_theme_auto` plugin).
-     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_lights_demo
-     */
-    function $mol_lights(next) {
-        const arg = parse(this.$mol_state_arg.value('mol_lights'));
-        if (next === undefined) {
-            return arg ?? this.$mol_state_local.value('$mol_lights') ?? base;
-        }
-        else {
-            if (arg === null) {
-                this.$mol_state_local.value('$mol_lights', next === base ? null : next);
-            }
-            else {
-                this.$mol_state_arg.value('mol_lights', String(next));
-            }
-            return next;
-        }
-    }
-    $.$mol_lights = $mol_lights;
 })($ || ($ = {}));
 
 ;
@@ -7724,6 +7701,116 @@ var $;
 var $;
 (function ($) {
     $mol_test({
+        'land covers faces only when it has the latest time and all units of every peer'() {
+            const master = new $giper_baza_face_map;
+            const land = new $giper_baza_face_map;
+            $mol_assert_equal($bog_id_land_covers(land, master), true);
+            master.peer_time('peer', 2, 1);
+            $mol_assert_equal($bog_id_land_covers(land, master), false);
+            land.peer_time('peer', 2, 0);
+            $mol_assert_equal($bog_id_land_covers(land, master), false);
+            land.peer_time('peer', 2, 1);
+            land.peer_time('other', 3, 0);
+            $mol_assert_equal($bog_id_land_covers(land, master), true);
+            master.peer_summ('peer', 2);
+            land.peer_summ('peer', 1);
+            $mol_assert_equal($bog_id_land_covers(land, master), false);
+            land.peer_summ('peer', 2);
+            $mol_assert_equal($bog_id_land_covers(land, master), true);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test({
+        async 'first device puts own key, second device takes it, unsynced land gives nothing'($) {
+            const grab = (name) => $mol_wire_async(() => {
+                const land = $.$giper_baza_glob.land_grab([[null, $giper_baza_rank_deny]]);
+                new $mol_wire_atom(name, () => $.$giper_baza_glob.Land(land.link())).fresh();
+                return land;
+            })();
+            const pointer = await grab('bog_id_key_test_pointer');
+            const land = await grab('bog_id_key_test_land');
+            await $mol_wire_async(pointer.Data($giper_baza_atom_text)).val(land.link().str);
+            let synced = false;
+            const context = $.$mol_ambient({ $bog_id_land_synced: () => synced });
+            const ask = (own) => $mol_wire_async(context).$bog_id_key(pointer.link().str, own);
+            $mol_assert_equal(await ask('one'), '');
+            synced = true;
+            $mol_assert_equal(await ask('one'), 'one');
+            $mol_assert_equal(await ask('two'), 'one');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            async 'same key joins, other key changes nothing until confirmed twice and own key is kept'($) {
+                const own = await $.$giper_baza_auth._generate();
+                const other = await $.$giper_baza_auth._generate();
+                const key_of = (auth) => auth.toString() + auth.toStringPrivate();
+                const memory = new Map();
+                let key = '';
+                const applied = [];
+                const context = $.$mol_ambient({
+                    $giper_baza_auth: class extends $giper_baza_auth {
+                        static current() { return own; }
+                    },
+                    $mol_state_local: {
+                        value: (name, next) => {
+                            if (next !== undefined)
+                                memory.set(name, next);
+                            return memory.get(name) ?? null;
+                        },
+                    },
+                    $bog_id_key: () => key,
+                });
+                const make = () => $bog_id_enter.make({
+                    $: context,
+                    apply: (next) => {
+                        if (next)
+                            applied.push(next);
+                        return '';
+                    },
+                });
+                const fresh = make();
+                $mol_assert_equal(fresh.parts(), [fresh.Enter(), fresh.Hint()]);
+                memory.set('bog_id_enter', { lord: 'L', name: 'Ann', pointer: 'P' });
+                $mol_assert_equal(make().status(), fresh.wait());
+                key = key_of(other);
+                const clash = make();
+                $mol_assert_equal(clash.conflicted(), true);
+                $mol_assert_equal(clash.joining(), null);
+                clash.replace();
+                $mol_assert_equal(applied, []);
+                clash.replace();
+                $mol_assert_equal(applied, [key]);
+                $mol_assert_equal(memory.get('bog_id_enter_prev'), [key_of(own)]);
+                key = key_of(own);
+                const same = make();
+                $mol_assert_equal(same.conflicted(), false);
+                $mol_assert_unique(same.joining(), null);
+                memory.set('bog_id_enter', { lord: 'L', name: 'Ann', pointer: 'P', done: own.pass().lord().str });
+                const joined = make();
+                $mol_assert_equal(joined.parts(), [joined.Status()]);
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
         'Special'() {
             $mol_assert_equal($mol_si_short(0), '0');
             $mol_assert_equal($mol_si_short(1 / 0), '∞');
@@ -7797,6 +7884,71 @@ var $;
             $mol_assert_equal(`${list}`, 'ab,ac,abc');
         },
     });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test({
+        'frame opens own dock with lights, current app and query'($) {
+            const frame = $bog_dock_frame.make({
+                $,
+                query: () => 'a/b c',
+            });
+            const [host, hash] = frame.uri().split('#');
+            $mol_assert_equal(host, 'https://b-on-g.github.io/dock/');
+            $mol_assert_equal(hash.includes('query=a%2Fb%20c'), true);
+            $mol_assert_equal(hash.includes('{'), false);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            'wide has bar, narrow has tab only, frame has nothing'($) {
+                const make = (wide, embedded) => $bog_dock_side.make({
+                    $: $.$mol_ambient({
+                        $mol_media: class extends $mol_media {
+                            static match() { return wide; }
+                        },
+                    }),
+                    embedded: () => embedded,
+                    popup: () => false,
+                });
+                const wide = make(true, false);
+                $mol_assert_equal(wide.sub(), [wide.Frame()]);
+                const narrow = make(false, false);
+                $mol_assert_equal(narrow.sub(), [narrow.Tab()]);
+                $mol_assert_equal(make(true, true).sub(), []);
+                $mol_assert_equal(make(false, true).sub(), []);
+            },
+            'tab opens by click and by swipe, click after swipe changes nothing'($) {
+                const side = $bog_dock_side.make({ $, mode: () => 'narrow' });
+                const pointer = (clientX) => ({ clientX, buttons: 1, pointerId: 1 });
+                const click = {};
+                side.tab_click(click);
+                $mol_assert_equal(side.sub(), [side.Shade(), side.Frame(), side.Tab()]);
+                side.close();
+                $mol_assert_equal(side.sub(), [side.Frame(), side.Tab()]);
+                side.tab_grab(pointer(2));
+                side.tab_move(pointer(10));
+                $mol_assert_equal(side.opened(), false);
+                side.tab_move(pointer(40));
+                side.tab_click(click);
+                $mol_assert_equal(side.opened(), true);
+                side.tab_grab(pointer(70));
+                side.tab_move(pointer(30));
+                side.tab_click(click);
+                $mol_assert_equal(side.opened(), false);
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
 })($ || ($ = {}));
 
 

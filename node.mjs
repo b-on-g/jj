@@ -3267,14 +3267,14 @@ var $;
     class $mol_view_selection extends $mol_object {
         static focused(next, notify) {
             const parents = [];
-            let element = next?.[0] ?? $mol_dom_context.document.activeElement;
+            let element = next?.[0] ?? $mol_dom.document.activeElement;
             while (element?.shadowRoot) {
                 element = element.shadowRoot.activeElement;
             }
             while (element) {
                 parents.push(element);
                 const parent = element.parentNode;
-                if (parent instanceof ShadowRoot)
+                if (parent instanceof $mol_dom.ShadowRoot)
                     element = parent.host;
                 else
                     element = parent;
@@ -3286,7 +3286,7 @@ var $;
                 if (element)
                     element.focus();
                 else
-                    $mol_dom_context.blur();
+                    $mol_dom.blur();
             });
             return parents;
         }
@@ -4740,6 +4740,34 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Disable reaping of current subscriber
+     */
+    function $mol_wire_solid() {
+        let current = $mol_wire_auto();
+        if (current.temp)
+            current = current.host;
+        if (current.reap !== nothing) {
+            current?.sub_on(sub, sub.data.length);
+        }
+        current.reap = nothing;
+    }
+    $.$mol_wire_solid = $mol_wire_solid;
+    const nothing = () => { };
+    const sub = new $mol_wire_pub_sub;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $.$mol_mem_persist = $mol_wire_solid;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
     /** State of time moment */
     class $mol_state_time extends $mol_object {
         static task(precision, reset) {
@@ -4773,6 +4801,7 @@ var $;
             return true;
         }
         static stats() {
+            $mol_mem_persist();
             $mol_state_time.now(1000);
             return $node.fs.statfsSync('.');
         }
@@ -5044,27 +5073,6 @@ var $;
         }
     }
     $.$mol_file_transaction = $mol_file_transaction;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    /**
-     * Disable reaping of current subscriber
-     */
-    function $mol_wire_solid() {
-        let current = $mol_wire_auto();
-        if (current.temp)
-            current = current.host;
-        if (current.reap !== nothing) {
-            current?.sub_on(sub, sub.data.length);
-        }
-        current.reap = nothing;
-    }
-    $.$mol_wire_solid = $mol_wire_solid;
-    const nothing = () => { };
-    const sub = new $mol_wire_pub_sub;
 })($ || ($ = {}));
 
 ;
@@ -8319,6 +8327,93 @@ var $;
 
 ;
 "use strict";
+var $;
+(function ($) {
+    /**
+     * Localisation in $mol framework
+     * @see https://mol.hyoo.ru/#!section=docs/=s5aqnb_odub8l
+     */
+    class $mol_locale extends $mol_object {
+        static lang_default() {
+            return 'en';
+        }
+        static lang(next) {
+            return this.$.$mol_state_local.value('locale', next) || $mol_dom_context.navigator.language.replace(/-.*/, '') || this.lang_default();
+        }
+        static langs_rtl() {
+            return ['ar', 'he', 'fa', 'ur', 'yi', 'ps', 'ug', 'sd'];
+        }
+        static direction() {
+            const lang = this.lang();
+            let direction;
+            try {
+                direction = new Intl.Locale(lang).getTextInfo().direction;
+            }
+            catch (e) {
+                $mol_fail_log(e);
+            }
+            return direction ?? (this.langs_rtl().includes(lang) ? 'rtl' : 'ltr');
+        }
+        static source(lang) {
+            return JSON.parse(this.$.$mol_file.relative(`web.locale=${lang}.json`).text().toString());
+        }
+        static texts(lang, next) {
+            if (next)
+                return next;
+            try {
+                return this.source(lang).valueOf();
+            }
+            catch (error) {
+                if ($mol_fail_catch(error)) {
+                    const def = this.lang_default();
+                    if (lang === def)
+                        throw error;
+                }
+            }
+            return {};
+        }
+        static text(key) {
+            const lang = this.lang();
+            const target = this.texts(lang)[key];
+            if (target)
+                return target;
+            this.warn(key);
+            const en = this.texts('en')[key];
+            if (!en)
+                return key;
+            return en;
+        }
+        static warn(key) {
+            console.warn(`Not translated to "${this.lang()}": ${key}`);
+            return null;
+        }
+    }
+    __decorate([
+        $mol_mem
+    ], $mol_locale, "lang_default", null);
+    __decorate([
+        $mol_mem
+    ], $mol_locale, "lang", null);
+    __decorate([
+        $mol_mem
+    ], $mol_locale, "direction", null);
+    __decorate([
+        $mol_mem_key
+    ], $mol_locale, "source", null);
+    __decorate([
+        $mol_mem_key
+    ], $mol_locale, "texts", null);
+    __decorate([
+        $mol_mem_key
+    ], $mol_locale, "text", null);
+    __decorate([
+        $mol_mem_key
+    ], $mol_locale, "warn", null);
+    $.$mol_locale = $mol_locale;
+})($ || ($ = {}));
+
+;
+"use strict";
 
 
 ;
@@ -8337,25 +8432,24 @@ var $;
                 const anchor_rect = this.Anchor()?.view_rect();
                 if (!anchor_rect)
                     return null;
+                const size = this.$.$mol_window.size();
                 const offset = this.offset();
                 const align = this.align();
                 const width = self_rect?.width ?? 0;
                 const height = self_rect?.height ?? 0;
-                let left = Math.floor((prev?.left ?? 0)
-                    - (self_rect?.left ?? 0)
-                    + width * align[0]
-                    + (anchor_rect?.left ?? 0)
-                    + offset[0] * (anchor_rect?.width ?? 0));
-                let top = Math.floor((prev?.top ?? 0)
-                    - (self_rect?.top ?? 0)
-                    + height * align[1]
-                    + (anchor_rect?.top ?? 0)
-                    + offset[1] * (anchor_rect?.height ?? 0));
-                const size = this.$.$mol_window.size();
-                left = Math.max(0, Math.min(left, size.width - width));
-                top = Math.max(0, Math.min(top, size.height - height));
+                let left = Math.floor(+width * align[0]
+                    + anchor_rect.left
+                    + offset[0] * anchor_rect.width);
+                const base_left = (prev?.left ?? 0) - (self_rect?.left ?? 0);
+                left = Math.max(0, Math.min(left, size.width - width)) + base_left;
+                let top = Math.floor(+height * align[1]
+                    + anchor_rect.top
+                    + offset[1] * anchor_rect.height);
+                const base_top = (prev?.top ?? 0) - (self_rect?.top ?? 0);
+                top = Math.max(0, Math.min(top, size.height - height)) + base_top;
                 return { left, top };
             }
+            locale() { return this.$.$mol_locale; }
             transform() {
                 const pos = this.pos();
                 if (!pos)
@@ -8480,93 +8574,6 @@ var $;
 		}
 	};
 
-
-;
-"use strict";
-var $;
-(function ($) {
-    /**
-     * Localisation in $mol framework
-     * @see https://mol.hyoo.ru/#!section=docs/=s5aqnb_odub8l
-     */
-    class $mol_locale extends $mol_object {
-        static lang_default() {
-            return 'en';
-        }
-        static lang(next) {
-            return this.$.$mol_state_local.value('locale', next) || $mol_dom_context.navigator.language.replace(/-.*/, '') || this.lang_default();
-        }
-        static langs_rtl() {
-            return ['ar', 'he', 'fa', 'ur', 'yi', 'ps', 'ug', 'sd'];
-        }
-        static direction() {
-            const lang = this.lang();
-            let direction;
-            try {
-                direction = new Intl.Locale(lang).getTextInfo().direction;
-            }
-            catch (e) {
-                $mol_fail_log(e);
-            }
-            return direction ?? (this.langs_rtl().includes(lang) ? 'rtl' : 'ltr');
-        }
-        static source(lang) {
-            return JSON.parse(this.$.$mol_file.relative(`web.locale=${lang}.json`).text().toString());
-        }
-        static texts(lang, next) {
-            if (next)
-                return next;
-            try {
-                return this.source(lang).valueOf();
-            }
-            catch (error) {
-                if ($mol_fail_catch(error)) {
-                    const def = this.lang_default();
-                    if (lang === def)
-                        throw error;
-                }
-            }
-            return {};
-        }
-        static text(key) {
-            const lang = this.lang();
-            const target = this.texts(lang)[key];
-            if (target)
-                return target;
-            this.warn(key);
-            const en = this.texts('en')[key];
-            if (!en)
-                return key;
-            return en;
-        }
-        static warn(key) {
-            console.warn(`Not translated to "${this.lang()}": ${key}`);
-            return null;
-        }
-    }
-    __decorate([
-        $mol_mem
-    ], $mol_locale, "lang_default", null);
-    __decorate([
-        $mol_mem
-    ], $mol_locale, "lang", null);
-    __decorate([
-        $mol_mem
-    ], $mol_locale, "direction", null);
-    __decorate([
-        $mol_mem_key
-    ], $mol_locale, "source", null);
-    __decorate([
-        $mol_mem_key
-    ], $mol_locale, "texts", null);
-    __decorate([
-        $mol_mem_key
-    ], $mol_locale, "text", null);
-    __decorate([
-        $mol_mem_key
-    ], $mol_locale, "warn", null);
-    $.$mol_locale = $mol_locale;
-})($ || ($ = {}));
 
 ;
 "use strict";
@@ -10871,7 +10878,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    $mol_style_attach("bog/builderui/theme.css", "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');\n\n:root {\n\t--bog_builderui_font_body: 'Inter', system-ui, sans-serif;\n\t--bog_builderui_font_head: 'Inter', system-ui, sans-serif;\n\t--bog_builderui_radius: 0.5rem;\n}\n\n/* ============================================================\n   RADIUS PRESETS\n   ============================================================ */\n[bog_builderui_radius=\"none\"] { --bog_builderui_radius: 0; }\n[bog_builderui_radius=\"small\"] { --bog_builderui_radius: 0.25rem; }\n[bog_builderui_radius=\"medium\"] { --bog_builderui_radius: 0.5rem; }\n[bog_builderui_radius=\"large\"] { --bog_builderui_radius: 1rem; }\n\n/* ============================================================\n   BODY FONT\n   ============================================================ */\n[bog_builderui_font_body=\"inter\"] { --bog_builderui_font_body: 'Inter', system-ui, sans-serif; }\n[bog_builderui_font_body=\"manrope\"] { --bog_builderui_font_body: 'Manrope', system-ui, sans-serif; }\n[bog_builderui_font_body=\"dm-sans\"] { --bog_builderui_font_body: 'DM Sans', system-ui, sans-serif; }\n[bog_builderui_font_body=\"eb-garamond\"] { --bog_builderui_font_body: 'EB Garamond', Georgia, serif; }\n\n/* ============================================================\n   HEADING FONT\n   ============================================================ */\n[bog_builderui_font_head=\"inter\"] { --bog_builderui_font_head: 'Inter', system-ui, sans-serif; }\n[bog_builderui_font_head=\"manrope\"] { --bog_builderui_font_head: 'Manrope', system-ui, sans-serif; }\n[bog_builderui_font_head=\"dm-sans\"] { --bog_builderui_font_head: 'DM Sans', system-ui, sans-serif; }\n[bog_builderui_font_head=\"eb-garamond\"] { --bog_builderui_font_head: 'EB Garamond', Georgia, serif; }\n\n/* ============================================================\n   BASE COLORS (neutral palette)\n   Vars: back, card, field, text, shade, line, hover\n   ============================================================ */\n\n/* === Slate (default) === */\n:root,\n[bog_builderui_base=\"slate\"][bog_builderui_lights=\"dark\"],\n[bog_builderui_base=\"slate\"][bog_builderui_lights=\"system\"] {\n\t--bog_builderui_back: #020817;\n\t--bog_builderui_card: #0f172a;\n\t--bog_builderui_field: #1e293b;\n\t--bog_builderui_text: #f8fafc;\n\t--bog_builderui_shade: #94a3b8;\n\t--bog_builderui_line: #1e293b;\n\t--bog_builderui_hover: #ffffff0d;\n}\n[bog_builderui_base=\"slate\"][bog_builderui_lights=\"light\"] {\n\t--bog_builderui_back: #ffffff;\n\t--bog_builderui_card: #f8fafc;\n\t--bog_builderui_field: #f1f5f9;\n\t--bog_builderui_text: #0f172a;\n\t--bog_builderui_shade: #64748b;\n\t--bog_builderui_line: #e2e8f0;\n\t--bog_builderui_hover: #0000000a;\n}\n\n/* === Stone === */\n[bog_builderui_base=\"stone\"][bog_builderui_lights=\"dark\"],\n[bog_builderui_base=\"stone\"][bog_builderui_lights=\"system\"] {\n\t--bog_builderui_back: #0c0a09;\n\t--bog_builderui_card: #1c1917;\n\t--bog_builderui_field: #292524;\n\t--bog_builderui_text: #fafaf9;\n\t--bog_builderui_shade: #a8a29e;\n\t--bog_builderui_line: #292524;\n\t--bog_builderui_hover: #ffffff0d;\n}\n[bog_builderui_base=\"stone\"][bog_builderui_lights=\"light\"] {\n\t--bog_builderui_back: #fafaf9;\n\t--bog_builderui_card: #ffffff;\n\t--bog_builderui_field: #f5f5f4;\n\t--bog_builderui_text: #0c0a09;\n\t--bog_builderui_shade: #78716c;\n\t--bog_builderui_line: #e7e5e4;\n\t--bog_builderui_hover: #0000000a;\n}\n\n/* === Zinc === */\n[bog_builderui_base=\"zinc\"][bog_builderui_lights=\"dark\"],\n[bog_builderui_base=\"zinc\"][bog_builderui_lights=\"system\"] {\n\t--bog_builderui_back: #09090b;\n\t--bog_builderui_card: #18181b;\n\t--bog_builderui_field: #27272a;\n\t--bog_builderui_text: #fafafa;\n\t--bog_builderui_shade: #a1a1aa;\n\t--bog_builderui_line: #27272a;\n\t--bog_builderui_hover: #ffffff0d;\n}\n[bog_builderui_base=\"zinc\"][bog_builderui_lights=\"light\"] {\n\t--bog_builderui_back: #ffffff;\n\t--bog_builderui_card: #fafafa;\n\t--bog_builderui_field: #f4f4f5;\n\t--bog_builderui_text: #09090b;\n\t--bog_builderui_shade: #71717a;\n\t--bog_builderui_line: #e4e4e7;\n\t--bog_builderui_hover: #0000000a;\n}\n\n/* === Gray === */\n[bog_builderui_base=\"gray\"][bog_builderui_lights=\"dark\"],\n[bog_builderui_base=\"gray\"][bog_builderui_lights=\"system\"] {\n\t--bog_builderui_back: #030712;\n\t--bog_builderui_card: #111827;\n\t--bog_builderui_field: #1f2937;\n\t--bog_builderui_text: #f9fafb;\n\t--bog_builderui_shade: #9ca3af;\n\t--bog_builderui_line: #1f2937;\n\t--bog_builderui_hover: #ffffff0d;\n}\n[bog_builderui_base=\"gray\"][bog_builderui_lights=\"light\"] {\n\t--bog_builderui_back: #ffffff;\n\t--bog_builderui_card: #f9fafb;\n\t--bog_builderui_field: #f3f4f6;\n\t--bog_builderui_text: #030712;\n\t--bog_builderui_shade: #6b7280;\n\t--bog_builderui_line: #e5e7eb;\n\t--bog_builderui_hover: #0000000a;\n}\n\n/* ============================================================\n   SYSTEM MODE — the reader has picked no theme, so the OS decides.\n\n   Without this, a page can only be light or dark once JavaScript has\n   run and set `lights`. A prerendered page therefore ships whatever\n   the snapshot was taken in, and a reader whose system is dark gets a\n   bright flash on every cold load. With `lights=\"system\"` in the\n   markup, CSS alone paints the first frame correctly.\n\n   The rules above already give system mode the dark palette; this\n   block flips it to light when the OS asks for light. An explicit\n   `lights=\"light\"` / `lights=\"dark\"` carries the same specificity and\n   a different attribute value, so a deliberate choice is untouched.\n   ============================================================ */\n@media (prefers-color-scheme: light) {\n\t[bog_builderui_base=\"slate\"][bog_builderui_lights=\"system\"] {\n\t\t--bog_builderui_back: #ffffff;\n\t\t--bog_builderui_card: #f8fafc;\n\t\t--bog_builderui_field: #f1f5f9;\n\t\t--bog_builderui_text: #0f172a;\n\t\t--bog_builderui_shade: #64748b;\n\t\t--bog_builderui_line: #e2e8f0;\n\t\t--bog_builderui_hover: #0000000a;\n\t}\n\t[bog_builderui_base=\"stone\"][bog_builderui_lights=\"system\"] {\n\t\t--bog_builderui_back: #fafaf9;\n\t\t--bog_builderui_card: #ffffff;\n\t\t--bog_builderui_field: #f5f5f4;\n\t\t--bog_builderui_text: #0c0a09;\n\t\t--bog_builderui_shade: #78716c;\n\t\t--bog_builderui_line: #e7e5e4;\n\t\t--bog_builderui_hover: #0000000a;\n\t}\n\t[bog_builderui_base=\"zinc\"][bog_builderui_lights=\"system\"] {\n\t\t--bog_builderui_back: #ffffff;\n\t\t--bog_builderui_card: #fafafa;\n\t\t--bog_builderui_field: #f4f4f5;\n\t\t--bog_builderui_text: #09090b;\n\t\t--bog_builderui_shade: #71717a;\n\t\t--bog_builderui_line: #e4e4e7;\n\t\t--bog_builderui_hover: #0000000a;\n\t}\n\t[bog_builderui_base=\"gray\"][bog_builderui_lights=\"system\"] {\n\t\t--bog_builderui_back: #ffffff;\n\t\t--bog_builderui_card: #f9fafb;\n\t\t--bog_builderui_field: #f3f4f6;\n\t\t--bog_builderui_text: #030712;\n\t\t--bog_builderui_shade: #6b7280;\n\t\t--bog_builderui_line: #e5e7eb;\n\t\t--bog_builderui_hover: #0000000a;\n\t}\n}\n\n/* ============================================================\n   ACCENT THEMES (vars: control, focus, current, special)\n   ============================================================ */\n\n:root,\n[bog_builderui_theme=\"sky\"] {\n\t--bog_builderui_control: #0ea5e9;\n\t--bog_builderui_focus: #38bdf8;\n\t--bog_builderui_current: #06b6d4;\n\t--bog_builderui_special: #6366f1;\n}\n[bog_builderui_theme=\"rose\"] {\n\t--bog_builderui_control: #f43f5e;\n\t--bog_builderui_focus: #fb7185;\n\t--bog_builderui_current: #ec4899;\n\t--bog_builderui_special: #f97316;\n}\n[bog_builderui_theme=\"violet\"] {\n\t--bog_builderui_control: #8b5cf6;\n\t--bog_builderui_focus: #a78bfa;\n\t--bog_builderui_current: #6366f1;\n\t--bog_builderui_special: #d946ef;\n}\n[bog_builderui_theme=\"emerald\"] {\n\t--bog_builderui_control: #10b981;\n\t--bog_builderui_focus: #34d399;\n\t--bog_builderui_current: #14b8a6;\n\t--bog_builderui_special: #84cc16;\n}\n[bog_builderui_theme=\"amber\"] {\n\t--bog_builderui_control: #f59e0b;\n\t--bog_builderui_focus: #fbbf24;\n\t--bog_builderui_current: #f97316;\n\t--bog_builderui_special: #eab308;\n}\n\n/* ============================================================\n   Bridge to --mol_theme_* so stock $mol components ($mol_chart,\n   $mol_button, $mol_string) pick up our palette automatically.\n   ============================================================ */\n:where([bog_builderui_lights]) {\n\t--mol_theme_back: var(--bog_builderui_back);\n\t--mol_theme_card: var(--bog_builderui_card);\n\t--mol_theme_field: var(--bog_builderui_field);\n\t--mol_theme_hover: var(--bog_builderui_hover);\n\t--mol_theme_text: var(--bog_builderui_text);\n\t--mol_theme_shade: var(--bog_builderui_shade);\n\t--mol_theme_line: var(--bog_builderui_line);\n\t--mol_theme_focus: var(--bog_builderui_focus);\n\t--mol_theme_control: var(--bog_builderui_control);\n\t--mol_theme_current: var(--bog_builderui_current);\n\t--mol_theme_special: var(--bog_builderui_special);\n}\n\n/* ============================================================\n   CHART COLOR — independent accent for the chart bar/line\n   ============================================================ */\n:root,\n[bog_builderui_chart=\"blue\"] { --bog_builderui_chart: #3b82f6; }\n[bog_builderui_chart=\"green\"] { --bog_builderui_chart: #10b981; }\n[bog_builderui_chart=\"red\"] { --bog_builderui_chart: #ef4444; }\n[bog_builderui_chart=\"yellow\"] { --bog_builderui_chart: #eab308; }\n[bog_builderui_chart=\"purple\"] { --bog_builderui_chart: #a855f7; }\n\n/* ============================================================\n   Popover for $bog_builderui_select (style the $mol_pop bubble\n   when it sits inside our scope or carries our marker)\n   ============================================================ */\n[bog_builderui_lights] [mol_pop_bubble],\n[bog_builderui_pop] {\n\tbackground-color: var(--bog_builderui_card);\n\tborder: 1px solid var(--bog_builderui_line);\n\tborder-radius: var(--bog_builderui_radius);\n\tbox-shadow: 0 10px 30px #00000059;\n\tpadding: 0.375rem;\n\tgap: 0.125rem;\n\tmin-width: 14rem;\n\toverflow: hidden;\n}\n\n[bog_builderui_lights] [mol_select_filter] {\n\tdisplay: none;\n}\n\n[bog_builderui_lights] [mol_select_option_row] {\n\tborder-radius: calc(var(--bog_builderui_radius) - 2px);\n\tpadding: 0.5rem 0.75rem;\n\tcolor: var(--bog_builderui_text);\n\tfont-family: var(--bog_builderui_font_body);\n\tfont-size: 0.9rem;\n\tbackground-color: transparent;\n}\n\n[bog_builderui_lights] [mol_select_option_row]:hover {\n\tbackground-color: var(--bog_builderui_hover);\n}\n\n[bog_builderui_lights] [mol_select_option_label] {\n\tpadding: 0;\n\tcolor: inherit;\n}\n\n[bog_builderui_lights] [mol_select_no_options] {\n\tcolor: var(--bog_builderui_shade);\n\tpadding: 0.5rem 0.75rem;\n}\n\n[bog_builderui_lights] [bog_builderui_select] [mol_select_trigger] {\n\tgap: 0.5rem;\n\tpadding: 0 0.25rem 0 0;\n}\n[bog_builderui_lights] [bog_builderui_select] [mol_select_trigger] > * {\n\tmargin-right: 0;\n}\n\n/* ============================================================\n   Skeleton — any $mol_view in pending state gets a pulsing surface\n   ============================================================ */\n@keyframes bog_builderui_skeleton_pulse {\n\t0%, 100% { opacity: 1; }\n\t50% { opacity: 0.5; }\n}\n\n[bog_builderui_lights] [mol_view][mol_view_error=\"Promise\"],\n[bog_builderui_lights] [mol_view][mol_view_error=\"$mol_promise_blocker\"] {\n\tborder-radius: var(--bog_builderui_radius);\n\tbackground-color: var(--bog_builderui_field);\n\tcolor: transparent;\n\tanimation: bog_builderui_skeleton_pulse 1.6s ease-in-out infinite;\n}\n\n/* ============================================================\n   Tooltip surface\n   ============================================================ */\n[bog_builderui_lights] [bog_builderui_tooltip] [mol_pop_bubble] {\n\tbackground-color: var(--bog_builderui_text);\n\tcolor: var(--bog_builderui_back);\n\tborder: none;\n\tborder-radius: calc(var(--bog_builderui_radius) - 2px);\n\tpadding: 0.375rem 0.625rem;\n\tfont-family: var(--bog_builderui_font_body);\n\tfont-size: 0.8rem;\n\tbox-shadow: 0 4px 12px #0000004d;\n\tmin-width: 0;\n}\n\n\n[bog_builderui_lights] input,\n[bog_builderui_lights] textarea,\n[bog_builderui_lights] select {\n\tfont-size: max( 16px, 1rem );\n}\n");
+    $mol_style_attach("bog/builderui/theme.css", "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');\n\n:root {\n\t--bog_builderui_font_body: 'Inter', system-ui, sans-serif;\n\t--bog_builderui_font_head: 'Inter', system-ui, sans-serif;\n\t--bog_builderui_radius: 0.5rem;\n}\n\n/* ============================================================\n   RADIUS PRESETS\n   ============================================================ */\n[bog_builderui_radius=\"none\"] { --bog_builderui_radius: 0; }\n[bog_builderui_radius=\"small\"] { --bog_builderui_radius: 0.25rem; }\n[bog_builderui_radius=\"medium\"] { --bog_builderui_radius: 0.5rem; }\n[bog_builderui_radius=\"large\"] { --bog_builderui_radius: 1rem; }\n\n/* ============================================================\n   BODY FONT\n   ============================================================ */\n[bog_builderui_font_body=\"inter\"] { --bog_builderui_font_body: 'Inter', system-ui, sans-serif; }\n[bog_builderui_font_body=\"manrope\"] { --bog_builderui_font_body: 'Manrope', system-ui, sans-serif; }\n[bog_builderui_font_body=\"dm-sans\"] { --bog_builderui_font_body: 'DM Sans', system-ui, sans-serif; }\n[bog_builderui_font_body=\"eb-garamond\"] { --bog_builderui_font_body: 'EB Garamond', Georgia, serif; }\n\n/* ============================================================\n   HEADING FONT\n   ============================================================ */\n[bog_builderui_font_head=\"inter\"] { --bog_builderui_font_head: 'Inter', system-ui, sans-serif; }\n[bog_builderui_font_head=\"manrope\"] { --bog_builderui_font_head: 'Manrope', system-ui, sans-serif; }\n[bog_builderui_font_head=\"dm-sans\"] { --bog_builderui_font_head: 'DM Sans', system-ui, sans-serif; }\n[bog_builderui_font_head=\"eb-garamond\"] { --bog_builderui_font_head: 'EB Garamond', Georgia, serif; }\n\n/* ============================================================\n   BASE COLORS (neutral palette)\n   Vars: back, card, field, text, shade, line, hover\n   ============================================================ */\n\n/* === Slate (default) === */\n:root,\n[bog_builderui_base=\"slate\"][bog_builderui_lights=\"dark\"],\n[bog_builderui_base=\"slate\"][bog_builderui_lights=\"system\"] {\n\t--bog_builderui_back: #020817;\n\t--bog_builderui_card: #0f172a;\n\t--bog_builderui_field: #1e293b;\n\t--bog_builderui_text: #f8fafc;\n\t--bog_builderui_shade: #94a3b8;\n\t--bog_builderui_line: #1e293b;\n\t--bog_builderui_hover: #ffffff0d;\n}\n[bog_builderui_base=\"slate\"][bog_builderui_lights=\"light\"] {\n\t--bog_builderui_back: #ffffff;\n\t--bog_builderui_card: #f8fafc;\n\t--bog_builderui_field: #f1f5f9;\n\t--bog_builderui_text: #0f172a;\n\t--bog_builderui_shade: #64748b;\n\t--bog_builderui_line: #e2e8f0;\n\t--bog_builderui_hover: #0000000a;\n}\n\n/* === Stone === */\n[bog_builderui_base=\"stone\"][bog_builderui_lights=\"dark\"],\n[bog_builderui_base=\"stone\"][bog_builderui_lights=\"system\"] {\n\t--bog_builderui_back: #0c0a09;\n\t--bog_builderui_card: #1c1917;\n\t--bog_builderui_field: #292524;\n\t--bog_builderui_text: #fafaf9;\n\t--bog_builderui_shade: #a8a29e;\n\t--bog_builderui_line: #292524;\n\t--bog_builderui_hover: #ffffff0d;\n}\n[bog_builderui_base=\"stone\"][bog_builderui_lights=\"light\"] {\n\t--bog_builderui_back: #fafaf9;\n\t--bog_builderui_card: #ffffff;\n\t--bog_builderui_field: #f5f5f4;\n\t--bog_builderui_text: #0c0a09;\n\t--bog_builderui_shade: #78716c;\n\t--bog_builderui_line: #e7e5e4;\n\t--bog_builderui_hover: #0000000a;\n}\n\n/* === Zinc === */\n[bog_builderui_base=\"zinc\"][bog_builderui_lights=\"dark\"],\n[bog_builderui_base=\"zinc\"][bog_builderui_lights=\"system\"] {\n\t--bog_builderui_back: #09090b;\n\t--bog_builderui_card: #18181b;\n\t--bog_builderui_field: #27272a;\n\t--bog_builderui_text: #fafafa;\n\t--bog_builderui_shade: #a1a1aa;\n\t--bog_builderui_line: #27272a;\n\t--bog_builderui_hover: #ffffff0d;\n}\n[bog_builderui_base=\"zinc\"][bog_builderui_lights=\"light\"] {\n\t--bog_builderui_back: #ffffff;\n\t--bog_builderui_card: #fafafa;\n\t--bog_builderui_field: #f4f4f5;\n\t--bog_builderui_text: #09090b;\n\t--bog_builderui_shade: #71717a;\n\t--bog_builderui_line: #e4e4e7;\n\t--bog_builderui_hover: #0000000a;\n}\n\n/* === Gray === */\n[bog_builderui_base=\"gray\"][bog_builderui_lights=\"dark\"],\n[bog_builderui_base=\"gray\"][bog_builderui_lights=\"system\"] {\n\t--bog_builderui_back: #030712;\n\t--bog_builderui_card: #111827;\n\t--bog_builderui_field: #1f2937;\n\t--bog_builderui_text: #f9fafb;\n\t--bog_builderui_shade: #9ca3af;\n\t--bog_builderui_line: #1f2937;\n\t--bog_builderui_hover: #ffffff0d;\n}\n[bog_builderui_base=\"gray\"][bog_builderui_lights=\"light\"] {\n\t--bog_builderui_back: #ffffff;\n\t--bog_builderui_card: #f9fafb;\n\t--bog_builderui_field: #f3f4f6;\n\t--bog_builderui_text: #030712;\n\t--bog_builderui_shade: #6b7280;\n\t--bog_builderui_line: #e5e7eb;\n\t--bog_builderui_hover: #0000000a;\n}\n\n/* ============================================================\n   SYSTEM MODE — the reader has picked no theme, so the OS decides.\n\n   Without this, a page can only be light or dark once JavaScript has\n   run and set `lights`. A prerendered page therefore ships whatever\n   the snapshot was taken in, and a reader whose system is dark gets a\n   bright flash on every cold load. With `lights=\"system\"` in the\n   markup, CSS alone paints the first frame correctly.\n\n   The rules above already give system mode the dark palette; this\n   block flips it to light when the OS asks for light. An explicit\n   `lights=\"light\"` / `lights=\"dark\"` carries the same specificity and\n   a different attribute value, so a deliberate choice is untouched.\n   ============================================================ */\n@media (prefers-color-scheme: light) {\n\t[bog_builderui_base=\"slate\"][bog_builderui_lights=\"system\"] {\n\t\t--bog_builderui_back: #ffffff;\n\t\t--bog_builderui_card: #f8fafc;\n\t\t--bog_builderui_field: #f1f5f9;\n\t\t--bog_builderui_text: #0f172a;\n\t\t--bog_builderui_shade: #64748b;\n\t\t--bog_builderui_line: #e2e8f0;\n\t\t--bog_builderui_hover: #0000000a;\n\t}\n\t[bog_builderui_base=\"stone\"][bog_builderui_lights=\"system\"] {\n\t\t--bog_builderui_back: #fafaf9;\n\t\t--bog_builderui_card: #ffffff;\n\t\t--bog_builderui_field: #f5f5f4;\n\t\t--bog_builderui_text: #0c0a09;\n\t\t--bog_builderui_shade: #78716c;\n\t\t--bog_builderui_line: #e7e5e4;\n\t\t--bog_builderui_hover: #0000000a;\n\t}\n\t[bog_builderui_base=\"zinc\"][bog_builderui_lights=\"system\"] {\n\t\t--bog_builderui_back: #ffffff;\n\t\t--bog_builderui_card: #fafafa;\n\t\t--bog_builderui_field: #f4f4f5;\n\t\t--bog_builderui_text: #09090b;\n\t\t--bog_builderui_shade: #71717a;\n\t\t--bog_builderui_line: #e4e4e7;\n\t\t--bog_builderui_hover: #0000000a;\n\t}\n\t[bog_builderui_base=\"gray\"][bog_builderui_lights=\"system\"] {\n\t\t--bog_builderui_back: #ffffff;\n\t\t--bog_builderui_card: #f9fafb;\n\t\t--bog_builderui_field: #f3f4f6;\n\t\t--bog_builderui_text: #030712;\n\t\t--bog_builderui_shade: #6b7280;\n\t\t--bog_builderui_line: #e5e7eb;\n\t\t--bog_builderui_hover: #0000000a;\n\t}\n}\n\n/* ============================================================\n   ACCENT THEMES (vars: control, focus, current, special)\n   ============================================================ */\n\n:root,\n[bog_builderui_theme=\"sky\"] {\n\t--bog_builderui_control: #0ea5e9;\n\t--bog_builderui_focus: #38bdf8;\n\t--bog_builderui_current: #06b6d4;\n\t--bog_builderui_special: #6366f1;\n}\n[bog_builderui_theme=\"rose\"] {\n\t--bog_builderui_control: #f43f5e;\n\t--bog_builderui_focus: #fb7185;\n\t--bog_builderui_current: #ec4899;\n\t--bog_builderui_special: #f97316;\n}\n[bog_builderui_theme=\"violet\"] {\n\t--bog_builderui_control: #8b5cf6;\n\t--bog_builderui_focus: #a78bfa;\n\t--bog_builderui_current: #6366f1;\n\t--bog_builderui_special: #d946ef;\n}\n[bog_builderui_theme=\"emerald\"] {\n\t--bog_builderui_control: #10b981;\n\t--bog_builderui_focus: #34d399;\n\t--bog_builderui_current: #14b8a6;\n\t--bog_builderui_special: #84cc16;\n}\n[bog_builderui_theme=\"amber\"] {\n\t--bog_builderui_control: #f59e0b;\n\t--bog_builderui_focus: #fbbf24;\n\t--bog_builderui_current: #f97316;\n\t--bog_builderui_special: #eab308;\n}\n\n/* ============================================================\n   Bridge to --mol_theme_* so stock $mol components ($mol_chart,\n   $mol_button, $mol_string) pick up our palette automatically.\n   ============================================================ */\n:where([bog_builderui_lights]) {\n\t--mol_theme_back: var(--bog_builderui_back);\n\t--mol_theme_card: var(--bog_builderui_card);\n\t--mol_theme_field: var(--bog_builderui_field);\n\t--mol_theme_hover: var(--bog_builderui_hover);\n\t--mol_theme_text: var(--bog_builderui_text);\n\t--mol_theme_shade: var(--bog_builderui_shade);\n\t--mol_theme_line: var(--bog_builderui_line);\n\t--mol_theme_focus: var(--bog_builderui_focus);\n\t--mol_theme_control: var(--bog_builderui_control);\n\t--mol_theme_current: var(--bog_builderui_current);\n\t--mol_theme_special: var(--bog_builderui_special);\n}\n\n/* ============================================================\n   CHART COLOR — independent accent for the chart bar/line\n   ============================================================ */\n:root,\n[bog_builderui_chart=\"blue\"] { --bog_builderui_chart: #3b82f6; }\n[bog_builderui_chart=\"green\"] { --bog_builderui_chart: #10b981; }\n[bog_builderui_chart=\"red\"] { --bog_builderui_chart: #ef4444; }\n[bog_builderui_chart=\"yellow\"] { --bog_builderui_chart: #eab308; }\n[bog_builderui_chart=\"purple\"] { --bog_builderui_chart: #a855f7; }\n\n/* ============================================================\n   Popover for $bog_builderui_select (style the $mol_pop bubble\n   when it sits inside our scope or carries our marker)\n   ============================================================ */\n[bog_builderui_lights] [mol_pop_bubble],\n[bog_builderui_pop] {\n\tbackground-color: var(--bog_builderui_card);\n\tborder: 1px solid var(--bog_builderui_line);\n\tborder-radius: var(--bog_builderui_radius);\n\tbox-shadow: 0 10px 30px #00000059;\n\tpadding: 0.375rem;\n\tgap: 0.125rem;\n\tmin-width: 14rem;\n\toverflow: hidden;\n}\n\n[bog_builderui_lights] [mol_select_bubble_pane][mol_scroll] {\n\tmax-height: none;\n}\n\n[bog_builderui_lights] [mol_select_filter] {\n\tdisplay: none;\n}\n\n[bog_builderui_lights] [mol_select_option_row] {\n\tborder-radius: calc(var(--bog_builderui_radius) - 2px);\n\tpadding: 0.5rem 0.75rem;\n\tcolor: var(--bog_builderui_text);\n\tfont-family: var(--bog_builderui_font_body);\n\tfont-size: 0.9rem;\n\tbackground-color: transparent;\n}\n\n[bog_builderui_lights] [mol_select_option_row]:hover {\n\tbackground-color: var(--bog_builderui_hover);\n}\n\n[bog_builderui_lights] [mol_select_option_label] {\n\tpadding: 0;\n\tcolor: inherit;\n}\n\n[bog_builderui_lights] [mol_select_no_options] {\n\tcolor: var(--bog_builderui_shade);\n\tpadding: 0.5rem 0.75rem;\n}\n\n[bog_builderui_lights] [bog_builderui_select] [mol_select_trigger] {\n\tgap: 0.5rem;\n\tpadding: 0 0.25rem 0 0;\n}\n[bog_builderui_lights] [bog_builderui_select] [mol_select_trigger] > * {\n\tmargin-right: 0;\n}\n\n/* ============================================================\n   Skeleton — any $mol_view in pending state gets a pulsing surface\n   ============================================================ */\n@keyframes bog_builderui_skeleton_pulse {\n\t0%, 100% { opacity: 1; }\n\t50% { opacity: 0.5; }\n}\n\n[bog_builderui_lights] [mol_view][mol_view_error=\"Promise\"],\n[bog_builderui_lights] [mol_view][mol_view_error=\"$mol_promise_blocker\"] {\n\tborder-radius: var(--bog_builderui_radius);\n\tbackground-color: var(--bog_builderui_field);\n\tcolor: transparent;\n\tanimation: bog_builderui_skeleton_pulse 1.6s ease-in-out infinite;\n}\n\n/* ============================================================\n   Tooltip surface\n   ============================================================ */\n[bog_builderui_lights] [bog_builderui_tooltip] [mol_pop_bubble] {\n\tbackground-color: var(--bog_builderui_text);\n\tcolor: var(--bog_builderui_back);\n\tborder: none;\n\tborder-radius: calc(var(--bog_builderui_radius) - 2px);\n\tpadding: 0.375rem 0.625rem;\n\tfont-family: var(--bog_builderui_font_body);\n\tfont-size: 0.8rem;\n\tbox-shadow: 0 4px 12px #0000004d;\n\tmin-width: 0;\n}\n\n\n[bog_builderui_lights] input,\n[bog_builderui_lights] textarea,\n[bog_builderui_lights] select {\n\tfont-size: max( 16px, 1rem );\n}\n");
 })($ || ($ = {}));
 
 ;
@@ -16739,6 +16746,7 @@ var $;
                         const sens = seal.shot().mix(this.link());
                         const sign = await auth.signer().sign(sens);
                         seal.sign(sign);
+                        seal.hash(null);
                     } while (seal.rate_min() > rate);
                     return seal;
                 });
@@ -17240,8 +17248,11 @@ var $;
         salt() {
             return new Uint8Array(this.buffer, this.byteOffset + 2, 16); /* tick(2), time(4), lord(10) */
         }
-        hash() {
-            return $giper_baza_link.hash_bin(this.asArray());
+        _hash = null;
+        hash(refresh) {
+            if (this._hash && !refresh)
+                return this._hash;
+            return this._hash = $giper_baza_link.hash_bin(this.asArray());
         }
         tier_min() {
             return $giper_baza_rank_tier.rule;
@@ -19648,7 +19659,7 @@ var $;
     }, 'Subj') {
         static meta = new $giper_baza_link(`${$.$giper_baza_flex_deck_link.str}_U2e5XejQ`);
         name(next) {
-            return this.Name(next)?.val(next) ?? this.link().str;
+            return this.Name(next)?.val(next) ?? '';
         }
         icon(next) {
             return this.Icon(next)?.val(next) ?? '💫';
@@ -28867,6 +28878,435 @@ var $;
 })($ || ($ = {}));
 
 ;
+"use strict";
+var $;
+(function ($) {
+    /** Public Giper ID profile of Lord, stored under own key in home Land */
+    function $bog_id_profile_of(lord, auto) {
+        return this.$giper_baza_glob.Land(new $giper_baza_link(lord))
+            .Data($giper_baza_dict)
+            .dive('bog_id', $bog_id_profile, auto);
+    }
+    $.$bog_id_profile_of = $bog_id_profile_of;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $bog_id_grant extends $giper_baza_dict.with({
+        App: $giper_baza_atom_text,
+        Scope: $giper_baza_atom_text,
+        Pointer: $giper_baza_atom_text,
+        Land: $giper_baza_atom_text,
+        Lands: $giper_baza_list_str,
+        Apps: $giper_baza_list_str,
+    }) {
+    }
+    $.$bog_id_grant = $bog_id_grant;
+    class $bog_id_store extends $giper_baza_dict.with({
+        Grants: $giper_baza_list_link_to(() => $bog_id_grant),
+    }) {
+    }
+    $.$bog_id_store = $bog_id_store;
+    class $bog_id_profile extends $giper_baza_dict.with({
+        Name: $giper_baza_atom_text,
+        Vault: $giper_baza_atom_text,
+        Stores: $giper_baza_list_str,
+    }) {
+    }
+    $.$bog_id_profile = $bog_id_profile;
+})($ || ($ = {}));
+
+;
+	($.$bog_id_enter) = class $bog_id_enter extends ($.$mol_list) {
+		parts(){
+			return [];
+		}
+		enter(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		status(){
+			return "";
+		}
+		replace_title(){
+			return (this.$.$mol_locale.text("$bog_id_enter_replace_title"));
+		}
+		replace(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		error(next){
+			if(next !== undefined) return next;
+			return "";
+		}
+		provider(){
+			return "https://dev-cmyser.github.io/id/";
+		}
+		scope(){
+			return "account";
+		}
+		apply(next){
+			if(next !== undefined) return next;
+			return "";
+		}
+		rows(){
+			return (this.parts());
+		}
+		Enter(){
+			const obj = new this.$.$mol_button_major();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_id_enter_Enter_title")));
+			(obj.click) = (next) => ((this.enter(next)));
+			return obj;
+		}
+		Hint(){
+			const obj = new this.$.$mol_paragraph();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_id_enter_Hint_title")));
+			return obj;
+		}
+		Status(){
+			const obj = new this.$.$mol_paragraph();
+			(obj.title) = () => ((this.status()));
+			return obj;
+		}
+		Replace(){
+			const obj = new this.$.$mol_button_minor();
+			(obj.title) = () => ((this.replace_title()));
+			(obj.click) = (next) => ((this.replace(next)));
+			return obj;
+		}
+		Error(){
+			const obj = new this.$.$mol_paragraph();
+			(obj.title) = () => ((this.error()));
+			return obj;
+		}
+		armed(next){
+			if(next !== undefined) return next;
+			return false;
+		}
+		replace_sure(){
+			return (this.$.$mol_locale.text("$bog_id_enter_replace_sure"));
+		}
+		wait(){
+			return (this.$.$mol_locale.text("$bog_id_enter_wait"));
+		}
+		conflict(){
+			return (this.$.$mol_locale.text("$bog_id_enter_conflict"));
+		}
+		done(){
+			return (this.$.$mol_locale.text("$bog_id_enter_done"));
+		}
+		error_bad(){
+			return (this.$.$mol_locale.text("$bog_id_enter_error_bad"));
+		}
+	};
+	($mol_mem(($.$bog_id_enter.prototype), "enter"));
+	($mol_mem(($.$bog_id_enter.prototype), "replace"));
+	($mol_mem(($.$bog_id_enter.prototype), "error"));
+	($mol_mem(($.$bog_id_enter.prototype), "apply"));
+	($mol_mem(($.$bog_id_enter.prototype), "Enter"));
+	($mol_mem(($.$bog_id_enter.prototype), "Hint"));
+	($mol_mem(($.$bog_id_enter.prototype), "Status"));
+	($mol_mem(($.$bog_id_enter.prototype), "Replace"));
+	($mol_mem(($.$bog_id_enter.prototype), "Error"));
+	($mol_mem(($.$bog_id_enter.prototype), "armed"));
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    /** Opens Giper ID popup, sends app Pass and resolves with Pointer to granted Land */
+    function $bog_id_login(provider, pass, scope) {
+        const win = $mol_dom_context;
+        const origin = new URL(provider, win.location.href).origin;
+        return new Promise((done, fail) => {
+            const popup = win.open(provider, 'bog_id', 'popup,width=440,height=640');
+            if (!popup)
+                return fail(new Error('Popup blocked'));
+            const timer = win.setInterval(() => {
+                if (popup.closed)
+                    finish(new Error('Popup closed'));
+            }, 500);
+            const finish = (error, grant) => {
+                win.clearInterval(timer);
+                win.removeEventListener('message', listen);
+                if (error)
+                    fail(error);
+                else
+                    done(grant);
+            };
+            const listen = (event) => {
+                if (event.origin !== origin)
+                    return;
+                if (event.source !== popup)
+                    return;
+                const data = event.data;
+                if (data?.bog_id === 'ready')
+                    popup.postMessage({ bog_id: 'request', pass, scope }, origin);
+                if (data?.bog_id === 'deny')
+                    finish(new Error('Access denied'));
+                if (data?.bog_id === 'grant') {
+                    popup.close();
+                    finish(null, {
+                        lord: String(data.lord),
+                        name: String(data.name ?? ''),
+                        pointer: String(data.pointer),
+                    });
+                }
+            };
+            win.addEventListener('message', listen);
+        });
+    }
+    $.$bog_id_login = $bog_id_login;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /** Resolves Pointer from Giper ID grant to current data Land */
+    function $bog_id_land(pointer) {
+        const glob = this.$giper_baza_glob;
+        const link = glob.Land(new $giper_baza_link(pointer)).Data($giper_baza_atom_text).val();
+        return link ? glob.Land(new $giper_baza_link(link)) : null;
+    }
+    $.$bog_id_land = $bog_id_land;
+    /** Has Land got everything that master knows */
+    function $bog_id_land_synced(str) {
+        const link = new $giper_baza_link(str);
+        const glob = this.$giper_baza_glob;
+        const land = glob.Land(link);
+        land.sync();
+        const faces = glob.yard().masters().map(port => glob.yard().face_port_land([port, link]));
+        this.$mol_state_time.now(500);
+        return faces.some(map => map && $bog_id_land_covers(land.faces, map));
+    }
+    $.$bog_id_land_synced = $bog_id_land_synced;
+    /** What master really has for Land, asked by separate connection */
+    function $bog_id_land_ask(master, land) {
+        return new Promise(done => {
+            const socket = new $mol_dom_context.WebSocket(master.replace(/^http/, 'ws'), ['$giper_baza_yard_2']);
+            socket.binaryType = 'arraybuffer';
+            const finish = (faces) => {
+                clearTimeout(timer);
+                socket.onopen = socket.onerror = socket.onmessage = null;
+                socket.close();
+                done(faces);
+            };
+            const timer = setTimeout(() => finish(null), 6000);
+            socket.onopen = () => socket.send(land.face_pack().asArray());
+            socket.onerror = () => finish(null);
+            socket.onmessage = event => {
+                if (!event.data?.byteLength)
+                    return;
+                const pack = new $giper_baza_pack(event.data);
+                const part = new Map(pack.parts()).get(land.link().str);
+                if (part)
+                    finish(part.faces);
+            };
+        });
+    }
+    $.$bog_id_land_ask = $bog_id_land_ask;
+    /** Sends Lands to master and checks that it really has them */
+    async function $bog_id_land_push(lands) {
+        const yard = this.$giper_baza_glob.yard();
+        for (let i = 0; i < 4; ++i) {
+            await Promise.all(lands.map(land => $mol_wire_async(land).units_saving()));
+            const master = await $mol_wire_async(yard).master_current();
+            const faces = await Promise.all(lands.map(land => this.$bog_id_land_ask(master, land)));
+            if (lands.every((land, at) => faces[at] && $bog_id_land_covers(faces[at], land.faces)))
+                return true;
+            if (!faces.every(Boolean))
+                await $mol_wire_async(yard).master_next();
+            else if (i)
+                yard.reconnects(null);
+            await new Promise(done => setTimeout(done, 800));
+        }
+        return false;
+    }
+    $.$bog_id_land_push = $bog_id_land_push;
+    function $bog_id_land_covers(left, right) {
+        return [...right].every(([peer, face]) => {
+            const own = left.get(peer);
+            return (own?.time_tick ?? 0) >= face.time_tick && (own?.summ ?? 0) >= face.summ;
+        });
+    }
+    $.$bog_id_land_covers = $bog_id_land_covers;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $bog_id_key_store extends $giper_baza_dict.with({
+        Key: $giper_baza_atom_text,
+    }) {
+    }
+    $.$bog_id_key_store = $bog_id_key_store;
+    /** Own key of app, the same on all devices: the first device puts it to granted Land. Empty while Land is not synced */
+    function $bog_id_key(pointer, own) {
+        const land = this.$bog_id_land(pointer);
+        if (!land)
+            return '';
+        const tines = land.Tine().items_vary()
+            .map(tine => $giper_baza_link_schema.cast(tine)?.str)
+            .filter($mol_guard_defined);
+        const synced = [pointer, land.link().str, ...tines].map(link => this.$bog_id_land_synced(link));
+        if (!synced.every(Boolean))
+            return '';
+        const rank = land.lord_rank(land.auth().pass().lord());
+        if (rank < $giper_baza_rank_post('late'))
+            return '';
+        const store = land.Data($bog_id_key_store);
+        const key = store.Key()?.val();
+        if (key)
+            return key;
+        store.Key('auto').val(own);
+        land.units_saving();
+        return own;
+    }
+    $.$bog_id_key = $bog_id_key;
+})($ || ($ = {}));
+
+;
+"use strict";
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        class $bog_id_enter extends $.$bog_id_enter {
+            own() {
+                const auth = this.$.$giper_baza_auth.current();
+                return auth.toString() + auth.toStringPrivate();
+            }
+            lord() {
+                return this.$.$giper_baza_auth.current().pass().lord().str;
+            }
+            grant(next) {
+                return this.$.$mol_state_local.value('bog_id_enter', next) ?? null;
+            }
+            enter() {
+                this.error('');
+                const pass = this.$.$giper_baza_auth.current().pass().toString();
+                this.$.$bog_id_login(this.provider(), pass, this.scope())
+                    .then(grant => this.grant(grant))
+                    .catch(error => this.error(error.message));
+            }
+            joined() {
+                return this.grant()?.done === this.lord();
+            }
+            key() {
+                const grant = this.grant();
+                if (!grant || this.joined())
+                    return '';
+                return this.$.$bog_id_key(grant.pointer, this.own());
+            }
+            key_ready() {
+                try {
+                    return this.key();
+                }
+                catch (error) {
+                    if (!$mol_promise_like(error))
+                        $mol_fail_log(error);
+                    return '';
+                }
+            }
+            conflicted() {
+                const key = this.key_ready();
+                return Boolean(key) && key !== this.own();
+            }
+            joining() {
+                const grant = this.grant();
+                if (!grant || this.key_ready() !== this.own())
+                    return null;
+                return new this.$.$mol_after_tick(() => this.grant({ ...grant, done: this.lord() }));
+            }
+            auto() {
+                this.joining();
+            }
+            status() {
+                const grant = this.grant();
+                if (!grant)
+                    return '';
+                if (this.joined())
+                    return this.done().replace('{name}', () => grant.name || grant.lord);
+                return this.conflicted() ? this.conflict() : this.wait();
+            }
+            replace_title() {
+                return this.armed() ? this.replace_sure() : super.replace_title();
+            }
+            auth_from(str) {
+                try {
+                    const auth = this.$.$giper_baza_auth.from(str);
+                    return auth.byteLength === 128 ? auth : null;
+                }
+                catch (error) {
+                    if ($mol_promise_like(error))
+                        $mol_fail_hidden(error);
+                    return null;
+                }
+            }
+            keep() {
+                const prev = this.$.$mol_state_local.value('bog_id_enter_prev') ?? [];
+                const own = this.own();
+                if (!prev.includes(own))
+                    this.$.$mol_state_local.value('bog_id_enter_prev', [...prev, own]);
+            }
+            replace() {
+                const key = this.key_ready();
+                if (!key)
+                    return;
+                const auth = this.auth_from(key);
+                this.error(auth ? '' : this.error_bad());
+                if (!auth)
+                    return;
+                if (!this.armed()) {
+                    this.armed(true);
+                    return;
+                }
+                this.keep();
+                this.apply(key);
+            }
+            apply(next) {
+                if (!next)
+                    return '';
+                this.$.$giper_baza_auth.current(this.$.$giper_baza_auth.from(next));
+                this.$.$mol_dom_context.location.reload();
+                return next;
+            }
+            parts() {
+                const grant = this.grant();
+                return [
+                    ...this.joined() ? [] : [this.Enter()],
+                    ...grant ? [this.Status()] : [this.Hint()],
+                    ...this.conflicted() ? [this.Replace()] : [],
+                    ...this.error() ? [this.Error()] : [],
+                ];
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $bog_id_enter.prototype, "key", null);
+        __decorate([
+            $mol_mem
+        ], $bog_id_enter.prototype, "joining", null);
+        __decorate([
+            $mol_action
+        ], $bog_id_enter.prototype, "replace", null);
+        __decorate([
+            $mol_action
+        ], $bog_id_enter.prototype, "apply", null);
+        $$.$bog_id_enter = $bog_id_enter;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
 	($.$bog_jj_app) = class $bog_jj_app extends ($.$mol_page) {
 		Theme(){
 			const obj = new this.$.$bog_theme_auto();
@@ -28999,6 +29439,10 @@ var $;
 			(obj.rows) = () => ((this.pages()));
 			return obj;
 		}
+		Id(){
+			const obj = new this.$.$bog_id_enter();
+			return obj;
+		}
 		title(){
 			return (this.$.$mol_locale.text("$bog_jj_app_title"));
 		}
@@ -29032,7 +29476,11 @@ var $;
 			];
 		}
 		body(){
-			return [(this.Nav()), (this.Pages())];
+			return [
+				(this.Nav()), 
+				(this.Pages()), 
+				(this.Id())
+			];
 		}
 	};
 	($mol_mem(($.$bog_jj_app.prototype), "Theme"));
@@ -29052,7 +29500,575 @@ var $;
 	($mol_mem(($.$bog_jj_app.prototype), "Feed"));
 	($mol_mem_key(($.$bog_jj_app.prototype), "Settings"));
 	($mol_mem(($.$bog_jj_app.prototype), "Pages"));
+	($mol_mem(($.$bog_jj_app.prototype), "Id"));
 
+
+;
+	($.$mol_embed_native) = class $mol_embed_native extends ($.$mol_scroll) {
+		uri(next){
+			if(next !== undefined) return next;
+			return "about:config";
+		}
+		title(){
+			return "";
+		}
+		Fallback(){
+			const obj = new this.$.$mol_link();
+			(obj.uri) = () => ((this.uri()));
+			(obj.sub) = () => ([(this.title())]);
+			return obj;
+		}
+		uri_change(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		dom_name(){
+			return "iframe";
+		}
+		window(){
+			return null;
+		}
+		attr(){
+			return {...(super.attr()), "src": (this.uri())};
+		}
+		sub(){
+			return [(this.Fallback())];
+		}
+		message(){
+			return {"hashchange": (next) => (this.uri_change(next))};
+		}
+	};
+	($mol_mem(($.$mol_embed_native.prototype), "uri"));
+	($mol_mem(($.$mol_embed_native.prototype), "Fallback"));
+	($mol_mem(($.$mol_embed_native.prototype), "uri_change"));
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    function $mol_wait_timeout_async(timeout) {
+        const promise = new $mol_promise();
+        const task = new this.$mol_after_timeout(timeout, () => promise.done());
+        return Object.assign(promise, {
+            destructor: () => task.destructor()
+        });
+    }
+    $.$mol_wait_timeout_async = $mol_wait_timeout_async;
+    function $mol_wait_timeout(timeout) {
+        return this.$mol_wire_sync(this).$mol_wait_timeout_async(timeout);
+    }
+    $.$mol_wait_timeout = $mol_wait_timeout;
+})($ || ($ = {}));
+
+;
+"use strict";
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        class $mol_embed_native extends $.$mol_embed_native {
+            window() {
+                $mol_wire_solid();
+                this.uri_resource();
+                return $mol_wire_sync(this).load(this.dom_node_actual());
+            }
+            load(frame) {
+                return new Promise((done, fail) => {
+                    frame.onload = () => {
+                        try {
+                            if (frame.contentWindow.location.href === 'about:blank') {
+                                return;
+                            }
+                        }
+                        catch { }
+                        done(frame.contentWindow);
+                    };
+                    frame.onerror = (event) => {
+                        fail(typeof event === 'string' ? new Error(event) : event.error || event);
+                    };
+                });
+            }
+            uri_resource() {
+                return this.uri().replace(/#.*/, '');
+            }
+            message_listener() {
+                return new $mol_dom_listener($mol_dom_context, 'message', $mol_wire_async(this).message_receive);
+            }
+            sub_visible() {
+                this.window();
+                return super.sub_visible();
+            }
+            message_receive(event) {
+                if (!event)
+                    return;
+                if (event.source !== this.window())
+                    return;
+                if (!Array.isArray(event.data))
+                    return;
+                this.message()[event.data[0]]?.(event);
+            }
+            uri_change(event) {
+                this.$.$mol_wait_timeout(1000);
+                this.uri(event.data[1]);
+            }
+            auto() {
+                return [
+                    this.message_listener(),
+                    this.window(),
+                ];
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $mol_embed_native.prototype, "window", null);
+        __decorate([
+            $mol_mem
+        ], $mol_embed_native.prototype, "uri_resource", null);
+        __decorate([
+            $mol_mem
+        ], $mol_embed_native.prototype, "message_listener", null);
+        $$.$mol_embed_native = $mol_embed_native;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_attach("mol/embed/native/native.view.css", "[mol_embed_native] {\n\tmin-width: 0;\n\tmin-height: 0;\n\tmax-width: 100%;\n\tmax-height: 100vh;\n\tobject-fit: cover;\n\tdisplay: flex;\n\tflex: 1 1 auto;\n\tobject-position: top left;\n\tborder-radius: var(--mol_gap_round);\n\taspect-ratio: 4/3;\n\tborder: none;\n}\n");
+})($ || ($ = {}));
+
+;
+	($.$mol_frame) = class $mol_frame extends ($.$mol_embed_native) {
+		allow(){
+			return "";
+		}
+		html(){
+			return null;
+		}
+		attr(){
+			return {
+				"tabindex": (this.tabindex()), 
+				"allow": (this.allow()), 
+				"src": (this.uri()), 
+				"srcdoc": (this.html())
+			};
+		}
+		fullscreen(){
+			return true;
+		}
+		accelerometer(){
+			return true;
+		}
+		autoplay(){
+			return true;
+		}
+		encription(){
+			return true;
+		}
+		gyroscope(){
+			return true;
+		}
+		pip(){
+			return true;
+		}
+		clipboard_read(){
+			return true;
+		}
+		clipboard_write(){
+			return true;
+		}
+	};
+
+
+;
+"use strict";
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        /**
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_frame_demo
+         */
+        class $mol_frame extends $.$mol_frame {
+            window() {
+                // if( this.html() ) return ( this.dom_node() as HTMLIFrameElement ).contentWindow!
+                return super.window();
+            }
+            allow() {
+                return [
+                    ...this.fullscreen() ? ['fullscreen'] : [],
+                    ...this.accelerometer() ? ['accelerometer'] : [],
+                    ...this.autoplay() ? ['autoplay'] : [],
+                    ...this.encription() ? ['encrypted-media'] : [],
+                    ...this.gyroscope() ? ['gyroscope'] : [],
+                    ...this.pip() ? ['picture-in-picture'] : [],
+                    ...this.clipboard_read() ? [`clipboard-read ${this.uri()}`] : [],
+                    ...this.clipboard_write() ? [`clipboard-write ${this.uri()}`] : [],
+                ].join('; ');
+            }
+        }
+        $$.$mol_frame = $mol_frame;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_define($mol_frame, {
+        border: {
+            style: 'none',
+        },
+        maxHeight: $mol_style_unit.vh(100),
+    });
+})($ || ($ = {}));
+
+;
+	($.$giper_web_frame) = class $giper_web_frame extends ($.$mol_frame) {
+		uri(){
+			return "https://web.giper.dev/#mol_lights={lights}/current={current}/query={query}";
+		}
+		query(){
+			return "";
+		}
+	};
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    function parse(theme) {
+        if (theme === 'true')
+            return true;
+        if (theme === 'false')
+            return false;
+        return null;
+    }
+    // Get once because chrome switches to light on print
+    const base = $.$mol_media.match('(prefers-color-scheme: light)');
+    /**
+     * Switcher between light/dark themes (usually for `mol_theme_auto` plugin).
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_lights_demo
+     */
+    function $mol_lights(next) {
+        const arg = parse(this.$mol_state_arg.value('mol_lights'));
+        if (next === undefined) {
+            return arg ?? this.$mol_state_local.value('$mol_lights') ?? base;
+        }
+        else {
+            if (arg === null) {
+                this.$mol_state_local.value('$mol_lights', next === base ? null : next);
+            }
+            else {
+                this.$mol_state_arg.value('mol_lights', String(next));
+            }
+            return next;
+        }
+    }
+    $.$mol_lights = $mol_lights;
+})($ || ($ = {}));
+
+;
+"use strict";
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        class $giper_web_frame extends $.$giper_web_frame {
+            uri() {
+                return super.uri()
+                    .replace('{lights}', String(this.$.$mol_lights()))
+                    .replace('{query}', encodeURIComponent(this.query()))
+                    .replace('{current}', encodeURIComponent(this.$.$mol_state_arg.href().replace(/^https?:\/\/|\/?\??#.*$/, '')));
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $giper_web_frame.prototype, "uri", null);
+        $$.$giper_web_frame = $giper_web_frame;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_attach("giper/web/frame/frame.view.css", "/* @keyframes giper_web_frame_show {\n\tfrom {\n\t\topacity: 0;\n\t}\n}\n\n[giper_web_frame] {\n\tanimation: 5s -1s ease-in giper_web_frame_show;\n} */\n");
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        $mol_style_define($giper_web_frame, {
+            flex: {
+                basis: '4rem',
+                shrink: 0,
+                grow: 0,
+            },
+        });
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+	($.$bog_dock_frame) = class $bog_dock_frame extends ($.$giper_web_frame) {
+		host(){
+			return "https://b-on-g.github.io/dock/";
+		}
+		lights(){
+			return true;
+		}
+		clipboard_read(){
+			return false;
+		}
+		clipboard_write(){
+			return false;
+		}
+	};
+
+
+;
+"use strict";
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        class $bog_dock_frame extends $.$bog_dock_frame {
+            lights() {
+                return this.$.$mol_lights();
+            }
+            uri() {
+                return super.uri()
+                    .replace(/^[^#]*/, this.host())
+                    .replace(/mol_lights=\w+/, `mol_lights=${this.lights()}`);
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $bog_dock_frame.prototype, "uri", null);
+        $$.$bog_dock_frame = $bog_dock_frame;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+	($.$bog_dock_side) = class $bog_dock_side extends ($.$mol_view) {
+		close(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		Shade(){
+			const obj = new this.$.$mol_view();
+			(obj.event) = () => ({"click": (next) => (this.close(next))});
+			return obj;
+		}
+		lights(){
+			return true;
+		}
+		Frame(){
+			const obj = new this.$.$bog_dock_frame();
+			(obj.lights) = () => ((this.lights()));
+			return obj;
+		}
+		tab_hint(){
+			return (this.$.$mol_locale.text("$bog_dock_side_tab_hint"));
+		}
+		tab_expanded(){
+			return "false";
+		}
+		tab_grab(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		tab_move(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		tab_click(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		Tab(){
+			const obj = new this.$.$mol_view();
+			(obj.dom_name) = () => ("button");
+			(obj.attr) = () => ({
+				...(this.$.$mol_view.prototype.attr.call(obj)), 
+				"type": "button", 
+				"title": (this.tab_hint()), 
+				"aria-label": (this.tab_hint()), 
+				"aria-expanded": (this.tab_expanded())
+			});
+			(obj.event) = () => ({
+				"pointerdown": (next) => (this.tab_grab(next)), 
+				"pointermove": (next) => (this.tab_move(next)), 
+				"click": (next) => (this.tab_click(next))
+			});
+			return obj;
+		}
+		mode(){
+			return "none";
+		}
+		opened(next){
+			if(next !== undefined) return next;
+			return false;
+		}
+		attr(){
+			return {
+				...(super.attr()), 
+				"bog_dock_side_mode": (this.mode()), 
+				"bog_dock_side_opened": (this.opened())
+			};
+		}
+		sub(){
+			return [
+				(this.Shade()), 
+				(this.Frame()), 
+				(this.Tab())
+			];
+		}
+	};
+	($mol_mem(($.$bog_dock_side.prototype), "close"));
+	($mol_mem(($.$bog_dock_side.prototype), "Shade"));
+	($mol_mem(($.$bog_dock_side.prototype), "Frame"));
+	($mol_mem(($.$bog_dock_side.prototype), "tab_grab"));
+	($mol_mem(($.$bog_dock_side.prototype), "tab_move"));
+	($mol_mem(($.$bog_dock_side.prototype), "tab_click"));
+	($mol_mem(($.$bog_dock_side.prototype), "Tab"));
+	($mol_mem(($.$bog_dock_side.prototype), "opened"));
+
+
+;
+"use strict";
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        class $bog_dock_side extends $.$bog_dock_side {
+            static swipe_min = 16;
+            embedded() {
+                const win = this.$.$mol_dom_context;
+                return win.parent !== win.self;
+            }
+            popup() {
+                return Boolean(this.$.$mol_dom_context.opener);
+            }
+            mode() {
+                if (this.embedded() || this.popup())
+                    return 'none';
+                return this.$.$mol_media.match('(min-width: 60rem)') ? 'wide' : 'narrow';
+            }
+            used(next = false) {
+                return next;
+            }
+            opened(next = false) {
+                return next;
+            }
+            toggle(next) {
+                if (next)
+                    this.used(true);
+                this.opened(next);
+            }
+            close() {
+                this.toggle(false);
+                return null;
+            }
+            tab_expanded() {
+                return String(this.opened());
+            }
+            grab_x = 0;
+            swiped = false;
+            tab_grab(event) {
+                if (!event)
+                    return null;
+                this.grab_x = event.clientX;
+                this.swiped = false;
+                const node = event.currentTarget;
+                node?.setPointerCapture?.(event.pointerId);
+                return null;
+            }
+            tab_move(event) {
+                if (!event || !event.buttons || this.swiped)
+                    return null;
+                const shift = event.clientX - this.grab_x;
+                if (Math.abs(shift) < $bog_dock_side.swipe_min)
+                    return null;
+                this.swiped = true;
+                this.toggle(shift > 0);
+                return null;
+            }
+            tab_click(event) {
+                if (!event)
+                    return null;
+                if (this.swiped)
+                    this.swiped = false;
+                else
+                    this.toggle(!this.opened());
+                return null;
+            }
+            lights() {
+                const root = this.$.$mol_view.roots()[0];
+                const theme = root?.Theme?.() ?? root?.Theme_auto?.();
+                return theme?.is_light_now?.() ?? this.$.$mol_lights();
+            }
+            sub() {
+                const mode = this.mode();
+                if (mode === 'none')
+                    return [];
+                if (mode === 'wide')
+                    return [this.Frame()];
+                return [
+                    ...this.opened() ? [this.Shade()] : [],
+                    ...this.used() ? [this.Frame()] : [],
+                    this.Tab(),
+                ];
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $bog_dock_side.prototype, "mode", null);
+        __decorate([
+            $mol_mem
+        ], $bog_dock_side.prototype, "used", null);
+        __decorate([
+            $mol_mem
+        ], $bog_dock_side.prototype, "opened", null);
+        __decorate([
+            $mol_action
+        ], $bog_dock_side.prototype, "toggle", null);
+        $$.$bog_dock_side = $bog_dock_side;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_attach("bog/dock/side/side.view.css", "[bog_dock_side][mol_view_root] {\n\tdisplay: none;\n\tposition: fixed;\n\tz-index: 1;\n\ttop: 0;\n\tleft: 0;\n\twidth: 4rem;\n\theight: 100%;\n\ttransition: none;\n}\n\n[bog_dock_side][mol_view_root][bog_dock_side_mode=\"wide\"] {\n\tdisplay: flex;\n}\n\n[bog_dock_side_frame] {\n\twidth: 4rem;\n\theight: 100%;\n}\n\nbody:has( > [bog_dock_side_mode=\"wide\"] ) {\n\tpadding-left: 4rem;\n}\n\n[bog_dock_side][mol_view_root][bog_dock_side_mode=\"narrow\"] {\n\tdisplay: block;\n\tz-index: 100;\n\twidth: 0;\n\theight: 0;\n}\n\n[bog_dock_side_mode=\"narrow\"] > [bog_dock_side_shade] {\n\tposition: fixed;\n\tinset: 0;\n\tbackground: #00000059;\n}\n\n[bog_dock_side_mode=\"narrow\"] > [bog_dock_side_frame] {\n\tposition: fixed;\n\ttop: 0;\n\tleft: 0;\n\theight: 100dvh;\n\tvisibility: hidden;\n\ttransform: translateX( -100% );\n\ttransition: transform .2s ease-out, visibility .2s;\n}\n\n[bog_dock_side_mode=\"narrow\"][bog_dock_side_opened=\"true\"] > [bog_dock_side_frame] {\n\tvisibility: visible;\n\ttransform: none;\n\tbox-shadow: 0 0 1.5rem #00000033;\n}\n\n[bog_dock_side_tab] {\n\tposition: fixed;\n\ttop: 50%;\n\tleft: 0;\n\twidth: 1.25rem;\n\theight: 4rem;\n\tmargin: -2rem 0 0;\n\tpadding: 0;\n\tborder: none;\n\tbackground: none;\n\tcursor: pointer;\n\ttouch-action: none;\n\t-webkit-tap-highlight-color: transparent;\n\ttransition: left .2s ease-out;\n}\n\n[bog_dock_side_tab]::before {\n\tcontent: '';\n\twidth: 6px;\n\theight: 100%;\n\tborder-radius: 0 6px 6px 0;\n\tbackground: hsl( 26, 82%, 44% );\n\topacity: .75;\n}\n\n[bog_dock_side_opened=\"true\"] > [bog_dock_side_tab] {\n\tleft: 4rem;\n}\n\n@media print {\n\t[bog_dock_side][mol_view_root][bog_dock_side_mode] { display: none; }\n\tbody:has( > [bog_dock_side_mode=\"wide\"] ) { padding-left: 0; }\n}\n");
+})($ || ($ = {}));
 
 ;
 "use strict";
