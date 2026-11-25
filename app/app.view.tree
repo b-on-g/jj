@@ -53,3 +53,4 @@ $bog_jj_app $mol_page
 					tag <= tag_current
 				<= Settings* $bog_jj_settings
 					blog_link <= settings_blog* \
+		<= Id $bog_id_enter
